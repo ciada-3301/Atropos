@@ -764,7 +764,7 @@ if __name__ == "__main__":
         title="Atropos v5 -- eDNA Taxonomic Identifier (CNN encoder)",
         description="Paste a DNA sequence to find its closest known taxonomic match based on the trained embedding model."
     )
-    demo.launch(share=False)  # local run -- opens http://127.0.0.1:7860
+    demo.launch(share=False)  # local run -- opens http://127. 0.0.1:7860
 
     # ----------------------------------------------------------------------
     # ## Notes
