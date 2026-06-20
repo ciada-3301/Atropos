@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Atropos Explorer — eDNA Embedding Space</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+
+  <div class="app-shell">
+
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-brand">
+        <span class="brand-mark">A</span>
+        <div class="brand-text">
+          <span class="brand-name">Atropos&nbsp;Explorer</span>
+          <span class="brand-sub">eDNA reference embedding map</span>
+        </div>
+      </div>
+      <div class="topbar-stats" id="topbarStats">
+        <span class="stat"><span class="stat-value" id="statPoints">—</span><span class="stat-label">reference sequences</span></span>
+        <span class="stat"><span class="stat-value" id="statRegions">—</span><span class="stat-label">taxonomic regions</span></span>
+      </div>
+    </header>
+
+    <main class="workspace">
+
+      <!-- LEFT: 3D viewport -->
+      <section class="viewport-panel">
+        <div class="viewport-header">
+          <span class="panel-label">VIEWPORT</span>
+          <div class="axis-legend">
+            <span class="axis-chip axis-x">X</span>
+            <span class="axis-chip axis-y">Y</span>
+            <span class="axis-chip axis-z">Z</span>
+          </div>
+          <div class="viewport-actions">
+            <button id="toggleRegionsBtn" class="ghost-btn" type="button" aria-pressed="true">Region labels</button>
+            <button id="resetCameraBtn" class="ghost-btn" type="button">Reset view</button>
+          </div>
+        </div>
+
+        <div id="viewportCanvas" class="viewport-canvas">
+          <div class="viewport-hint">drag to rotate · scroll to zoom · right-drag to pan</div>
+          <div id="loadingOverlay" class="loading-overlay">
+            <div class="loading-spinner"></div>
+            <span>Loading reference space…</span>
+          </div>
+        </div>
+
+        <div class="viewport-footer">
+          <div id="hoverInfo" class="hover-info">Hover a point to inspect it</div>
+        </div>
+      </section>
+
+      <!-- RIGHT: control panel -->
+      <section class="control-panel">
+
+        <div class="panel-block">
+          <div class="panel-block-header">
+            <span class="panel-label">SEQUENCE INPUT</span>
+          </div>
+          <textarea
+            id="sequenceInput"
+            class="sequence-textarea"
+            placeholder="Paste a raw DNA sequence or FASTA record…&#10;&#10;e.g. ACGTACGGTTAGCATCGGA…"
+            spellcheck="false"
+          ></textarea>
+          <div class="input-row">
+            <label class="k-label" for="kSlider">Matches
+              <input type="range" id="kSlider" min="1" max="25" value="10" />
+              <span id="kValue">10</span>
+            </label>
+            <button id="mapBtn" class="primary-btn" type="button">Map sequence</button>
+          </div>
+          <div id="errorBanner" class="error-banner" hidden></div>
+        </div>
+
+        <div class="panel-block result-block" id="resultBlock" hidden>
+          <div class="panel-block-header">
+            <span class="panel-label">NEAREST NEIGHBOR</span>
+          </div>
+          <div class="top-match">
+            <div class="top-match-name" id="topMatchName">—</div>
+            <div class="top-match-meta" id="topMatchMeta">—</div>
+            <div class="distance-row">
+              <span class="distance-row-label">distance</span>
+              <div class="distance-bar-track">
+                <div class="distance-bar-fill" id="topMatchBar"></div>
+              </div>
+              <span class="distance-row-value" id="topMatchDistance">—</span>
+            </div>
+          </div>
+          <div class="confidence-line">
+            best guess genus: <strong id="bestGenus">—</strong>
+            <span class="confidence-pill" id="confidencePill">—</span>
+          </div>
+        </div>
+
+        <div class="panel-block matches-block" id="matchesBlock" hidden>
+          <div class="panel-block-header">
+            <span class="panel-label">ALL MATCHES — sorted by distance</span>
+          </div>
+          <div class="matches-list" id="matchesList"></div>
+        </div>
+
+        <div class="panel-block regions-block">
+          <div class="panel-block-header">
+            <span class="panel-label">TAXONOMIC REGIONS</span>
+            <span class="panel-label-sub">largest clusters in this space</span>
+          </div>
+          <div class="regions-list" id="regionsList">
+            <div class="regions-empty">Loading…</div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="{{ url_for('static', filename='js/orbit-controls.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/viewport.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
