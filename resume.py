@@ -1,21 +1,24 @@
 """
-Atropos v5 -- RESUME script.
+Atropos v5 -- RESUME PART 2 script.
 
-Use this instead of re-running atropos_v5.py from scratch. It loads the
-artifacts you already produced and saved to ./data/ (sequences.json,
-encoder.pt, upproj.pt) and continues from section 8 (FAISS indexing)
-onward. None of the 18-hour scan/train work is repeated.
+Use this after atropos_resume.py already succeeded through section 9
+(FAISS index built, reference.index + taxonomy_lookup.json saved to
+./data/). This script skips straight to UMAP + Gradio, loading the index
+and embeddings back from disk instead of recomputing them.
+
+Before running, make sure these are installed:
+    pip install umap-learn gradio matplotlib faiss-cpu
 
 Run with:
-    python atropos_resume.py
+    python atropos_resume_part2.py
 """
 
 import json
-import time as _time
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from collections import Counter
 
 torch.set_num_threads(4)
@@ -24,7 +27,6 @@ torch.set_num_interop_threads(1)
 VOCAB = {"A": 0, "C": 1, "G": 2, "T": 3, "N": 4, "PAD": 5}
 MAX_LEN = 700
 EMBED_DIM = 256
-UPPROJ_DIM = 5000
 
 
 def tokenize(seq, max_len=MAX_LEN):
@@ -53,20 +55,7 @@ class DNAEncoderCNN(nn.Module):
         return F.normalize(emb, dim=-1)
 
 
-class UpProjector(nn.Module):
-    def __init__(self, in_dim=EMBED_DIM, out_dim=UPPROJ_DIM):
-        super().__init__()
-        self.proj = nn.Linear(in_dim, out_dim)
-
-    def forward(self, x):
-        return self.proj(x)
-
-
-print("=== Loading cached artifacts (no retraining) ===")
-
-with open("./data/sequences.json") as f:
-    records = json.load(f)
-print(f"  loaded {len(records):,} records from sequences.json")
+print("=== Loading cached artifacts (index already built, no retraining/reindexing) ===")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -76,53 +65,22 @@ encoder.to(device)
 encoder.eval()
 print("  loaded encoder.pt")
 
-upproj = UpProjector()
-upproj.load_state_dict(torch.load("./data/upproj.pt", map_location=device))
-upproj.to(device)
-upproj.eval()
-print("  loaded upproj.pt")
-
-print("Pre-tokenizing all sequences...")
-_t0 = _time.time()
-all_tokenized = torch.tensor([tokenize(r["sequence"]) for r in records], dtype=torch.long)
-print(f"  done in {_time.time()-_t0:.1f}s")
-
-# ----------------------------------------------------------------------
-# SECTION 8: Build the searchable reference index (FAISS) + taxonomy lookup
-# ----------------------------------------------------------------------
-print("\n=== 8. Build the searchable reference index (FAISS) + taxonomy lookup ===")
+with open("./data/taxonomy_lookup.json") as f:
+    taxonomy_lookup = json.load(f)
+print(f"  loaded taxonomy_lookup.json ({len(taxonomy_lookup):,} records)")
 
 import faiss
-import numpy as np
+index = faiss.read_index("./data/reference.index")
+print(f"  loaded reference.index ({index.ntotal:,} vectors)")
 
-all_embeds = []
-with torch.no_grad():
-    for i in range(0, len(records), 512):
-        batch = all_tokenized[i:i + 512].to(device)
-        z = encoder(batch).cpu().numpy()
-        all_embeds.append(z)
-all_embeds = np.concatenate(all_embeds, axis=0).astype("float32")
-
-index = faiss.IndexFlatIP(EMBED_DIM)
-index.add(all_embeds)
-faiss.write_index(index, "./data/reference.index")
-
-taxonomy_lookup = [
-    {k: r.get(k, "") for k in
-     ["phylum_name", "class_name", "order_name", "family_name", "genus_name", "species_name"]}
-    for r in records
-]
-with open("./data/taxonomy_lookup.json", "w") as f:
-    json.dump(taxonomy_lookup, f)
-
-print(f"Index built with {index.ntotal} reference sequences.")
+# Pull all embeddings back out of the FAISS index (cheap, it's an
+# IndexFlatIP so vectors are stored contiguously and reconstructable).
+all_embeds = index.reconstruct_n(0, index.ntotal).astype("float32")
+print(f"  reconstructed embeddings array: {all_embeds.shape}")
 
 # ----------------------------------------------------------------------
-# SECTION 9: Query function -- raw sequence -> nearest taxa + confidence
+# SECTION 9b: Query function (needed by the Gradio UI below)
 # ----------------------------------------------------------------------
-print("\n=== 9. Query function: raw sequence -> nearest taxa + confidence ===")
-
-
 def predict_taxon(raw_sequence, k=5):
     raw_sequence = raw_sequence.strip().upper().replace("U", "T")
     toks = torch.tensor([tokenize(raw_sequence)]).to(device)
@@ -155,9 +113,6 @@ def predict_taxon(raw_sequence, k=5):
     }
 
 
-example_seq = records[0]["sequence"]
-print(predict_taxon(example_seq))
-
 # ----------------------------------------------------------------------
 # SECTION 10: 2D map of the embedding space (UMAP)
 # ----------------------------------------------------------------------
@@ -180,6 +135,7 @@ plt.title("Atropos v5 embedding space -- colored by phylum")
 plt.xlabel("UMAP-1")
 plt.ylabel("UMAP-2")
 plt.savefig("./data/embedding_map.png", dpi=150, bbox_inches="tight")
+print("  saved ./data/embedding_map.png")
 plt.show()
 
 # ----------------------------------------------------------------------
@@ -213,4 +169,4 @@ demo = gr.Interface(
     title="Atropos v5 -- eDNA Taxonomic Identifier (CNN encoder)",
     description="Paste a DNA sequence to find its closest known taxonomic match based on the trained embedding model."
 )
-demo.launch(share=False)
+demo.launch(share=False)  # opens http://127.0.0.1:7860
