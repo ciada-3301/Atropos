@@ -4,3 +4,5 @@ BOLD_Public.22-May-2026.tsv
 data/encoder.pt
 data/upproj.pt
 data/sequences.json
+data/reference.index
+data/taxonomy_lookup.json
