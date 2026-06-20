@@ -1,3 +1,6 @@
 BOLD_Public.22-May-2026.datapackage.json
 BOLD_Public.22-May-2026.tsv
 .vscode
+data/encoder.pt
+data/upproj.pt
+data/sequences.json
